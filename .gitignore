@@ -42,3 +42,16 @@
 
 # Build
 build/
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+.cache/
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+
+FHE_project_spec.md
