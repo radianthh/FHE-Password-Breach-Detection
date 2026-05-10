@@ -6,14 +6,26 @@
 #include <iostream>
 #include <chrono>
 #include <string>
+#include <sstream>
+#include <iomanip>
 
 using namespace std;
 using namespace chrono;
 
+static string fmtDuration(double ms) {
+    ostringstream oss;
+    oss << fixed << setprecision(2);
+    if (ms >= 1000.0) oss << ms / 1000.0 << " s";
+    else oss << ms << " ms";
+    return oss.str();
+}
+
+// 대화형 모드: 두 방법을 순서대로 실행하고 결과·시간을 비교 출력
 static void runInteractive(const string& password) {
     uint64_t hash_user = hashPassword(password);
 
-    // ── 방법 1: 뺄셈 기반 (poly_modulus_degree=4096) ──────────────────
+    // ── 방법 1: 뺄셈 기반 ─────────────────────────────────────────────
+    // poly_modulus_degree=4096: 슬롯 불필요, noise budget이 작아도 단순 뺄셈에 충분
     cout << "\n=== 방법 1: 뺄셈 기반 (poly_modulus_degree=4096) ===" << endl;
     Client client1(4096);
     Server server1(client1.context());
@@ -24,9 +36,10 @@ static void runInteractive(const string& password) {
     auto t1_end   = high_resolution_clock::now();
     double ms1 = duration_cast<microseconds>(t1_end - t1_start).count() / 1000.0;
 
-    // ── 방법 2: 페르마 소정리 기반 (poly_modulus_degree=8192) ──────────
-    cout << "\n=== 방법 2: 페르마 소정리 기반 (poly_modulus_degree=8192) ===" << endl;
-    Client client2(8192, true); // deep_mult=true: 16회 제곱용 custom coeff_modulus
+    // ── 방법 2: 페르마 소정리 기반 ────────────────────────────────────
+    // poly_modulus_degree=32768: BFVDefault(32768)≈881 bits → 16회 제곱 후 약 425 bits 잔존
+    cout << "\n=== 방법 2: 페르마 소정리 기반 (poly_modulus_degree=32768, SIMD) ===" << endl;
+    Client client2(32768);
     Server server2(client2.context());
     server2.loadDB(DB_PATH);
 
@@ -41,50 +54,19 @@ static void runInteractive(const string& password) {
     cout << "[방법1] ";
     if (result1 >= 0) cout << "유출된 비밀번호! (DB " << result1 + 1 << "번째 항목)" << endl;
     else cout << "안전합니다." << endl;
-    cout << "[방법1] 소요 시간: " << ms1 << " ms" << endl;
+    cout << "[방법1] 소요 시간: " << fmtDuration(ms1) << endl;
 
     cout << "[방법2] ";
     if (result2 >= 0) cout << "유출된 비밀번호! (DB " << result2 + 1 << "번째 항목)" << endl;
     else cout << "안전합니다." << endl;
-    cout << "[방법2] 소요 시간: " << ms2 << " ms" << endl;
+    cout << "[방법2] 소요 시간: " << fmtDuration(ms2) << endl;
 
     cout << "\n[검증] 두 방법 결과 ";
     if (result1 == result2) cout << "일치" << endl;
     else cout << "불일치!" << endl;
 }
 
-// CLI 인자로 비밀번호를 받으면 JSON 출력 (FastAPI 연동용)
-// 인자 없으면 대화형 모드
-int main(int argc, char* argv[]) {
-    if (argc >= 2) {
-        string password = argv[1];
-        uint64_t hash_user = hashPassword(password);
-
-        Client client1(4096);
-        Server server1(client1.context());
-        server1.loadDB(DB_PATH);
-        auto t1s = high_resolution_clock::now();
-        int r1 = runSubtraction(client1, server1, hash_user);
-        double ms1 = duration_cast<microseconds>(high_resolution_clock::now() - t1s).count() / 1000.0;
-
-        Client client2(8192, true);
-        Server server2(client2.context());
-        server2.loadDB(DB_PATH);
-        auto t2s = high_resolution_clock::now();
-        int r2 = runFermat(client2, server2, hash_user);
-        double ms2 = duration_cast<microseconds>(high_resolution_clock::now() - t2s).count() / 1000.0;
-
-        // FastAPI가 파싱할 JSON (stderr 로그와 분리되도록 stdout에만 출력)
-        cout << "{"
-             << "\"sub_result\":"     << r1   << ","
-             << "\"sub_ms\":"         << ms1  << ","
-             << "\"fermat_result\":"  << r2   << ","
-             << "\"fermat_ms\":"      << ms2
-             << "}" << endl;
-        return 0;
-    }
-
-    // 대화형 모드
+int main() {
     string password;
     cout << "비밀번호를 입력하세요: ";
     cin >> password;
