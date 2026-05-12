@@ -12,6 +12,7 @@
 using namespace std;
 using namespace chrono;
 
+// 1000ms 넘어가면 s로 단위 변환하는 함수
 static string fmtDuration(double ms) {
     ostringstream oss;
     oss << fixed << setprecision(2);
@@ -20,13 +21,12 @@ static string fmtDuration(double ms) {
     return oss.str();
 }
 
-// 대화형 모드: 두 방법을 순서대로 실행하고 결과·시간을 비교 출력
 static void runInteractive(const string& password) {
     uint64_t hash_user = hashPassword(password);
 
-    // ── 방법 1: 뺄셈 기반 ─────────────────────────────────────────────
+    // 방법 1: 뺄셈 기반
     // poly_modulus_degree=4096: 슬롯 불필요, noise budget이 작아도 단순 뺄셈에 충분
-    cout << "\n=== 방법 1: 뺄셈 기반 (poly_modulus_degree=4096) ===" << endl;
+    cout << "\n=== 방법 1: 뺄셈 기반 ===" << endl;
     Client client1(4096);
     Server server1(client1.context());
     server1.loadDB(DB_PATH);
@@ -36,9 +36,9 @@ static void runInteractive(const string& password) {
     auto t1_end   = high_resolution_clock::now();
     double ms1 = duration_cast<microseconds>(t1_end - t1_start).count() / 1000.0;
 
-    // ── 방법 2: 페르마 소정리 기반 ────────────────────────────────────
-    // poly_modulus_degree=32768: BFVDefault(32768)≈881 bits → 16회 제곱 후 약 425 bits 잔존
-    cout << "\n=== 방법 2: 페르마 소정리 기반 (poly_modulus_degree=32768, SIMD) ===" << endl;
+    // 방법 2: 페르마 소정리 기반
+    // poly_modulus_degree=32768 -> 16384 noise budget 작음
+    cout << "\n=== 방법 2: 페르마 소정리 기반 ===" << endl;
     Client client2(32768);
     Server server2(client2.context());
     server2.loadDB(DB_PATH);

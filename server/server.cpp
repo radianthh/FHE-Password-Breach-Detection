@@ -21,10 +21,9 @@ void Server::loadDB(const string& filepath) {
 }
 
 // 방법 1: 각 DB 항목에 대해 Enc(hash_user - hash_db[i]) 계산
-// 서버는 암호화된 상태로만 연산 → 비교 결과(0 여부)를 직접 알 수 없음
 vector<Ciphertext> Server::computeDiffs(const Ciphertext& enc_user, Evaluator& evaluator) {
     vector<Ciphertext> diffs;
-    diffs.reserve(db_.size()); // 벡터 공간 확보
+    diffs.reserve(db_.size());                          // 벡터 공간 확보
     for (uint64_t hash_db : db_) {
         Ciphertext diff = enc_user;                    // 암호문 복사
         Plaintext plain_db(toHex(hash_db));
@@ -34,9 +33,7 @@ vector<Ciphertext> Server::computeDiffs(const Ciphertext& enc_user, Evaluator& e
     return diffs;
 }
 
-// 방법 2: 페르마 소정리 기반 SIMD 배치 비교
-// 원리: 소수 p=65537에서 x^(p-1) mod p → x=0이면 0, x≠0이면 1 (페르마 소정리)
-// SIMD로 DB 전체를 슬롯에 묶어 단 하나의 암호문으로 일괄 처리
+// 방법 2: 페르마 소정리 기반 SIMD Computation 활용
 Ciphertext Server::computeFermat(const Ciphertext& enc_user_batch, Evaluator& evaluator, 
     const RelinKeys& relin_keys) {
     BatchEncoder encoder(context_);
@@ -50,12 +47,12 @@ Ciphertext Server::computeFermat(const Ciphertext& enc_user_batch, Evaluator& ev
     Plaintext plain_db;
     encoder.encode(db_slots, plain_db);
 
-    // 각 슬롯: diff_i = hash_user - db[i] (FHE 상태, 전 슬롯 동시 연산)
+    // 각 슬롯: diff_i = hash_user - db[i]
     Ciphertext result = enc_user_batch;
     evaluator.sub_plain_inplace(result, plain_db);
 
     // diff^65536 = diff^(2^16): 16번 제곱으로 계산
-    // 매 제곱 후 재선형화(relinearize)해 암호문 크기(noise)를 줄임
+    // 매 제곱 후 relinearize -> 암호문 크기(noise)를 줄임
     for (int i = 0; i < 16; i++) {
         evaluator.square_inplace(result); // 암호문을 자기 자신과 곱해서 제곱하는 함수
         evaluator.relinearize_inplace(result, relin_keys); // 곱셈 후 암호문 크기를 다시 줄이는 역할
