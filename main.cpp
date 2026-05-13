@@ -25,7 +25,7 @@ static void runInteractive(const string& password) {
     uint64_t hash_user = hashPassword(password);
 
     // 방법 1: 뺄셈 기반
-    // poly_modulus_degree=4096: 슬롯 불필요, noise budget이 작아도 단순 뺄셈에 충분
+    // poly_modulus_degree=4096: noise budget이 작아도 단순 뺄셈에 충분
     cout << "\n=== 방법 1: 뺄셈 기반 ===" << endl;
     Client client1(4096);
     Server server1(client1.context());
@@ -48,7 +48,7 @@ static void runInteractive(const string& password) {
     auto t2_end   = high_resolution_clock::now();
     double ms2 = duration_cast<microseconds>(t2_end - t2_start).count() / 1000.0;
 
-    // ── 결과 비교 출력 ──────────────────────────────────────────────────
+    // 결과 비교 출력
     cout << "\n========== 결과 비교 ==========" << endl;
 
     cout << "[방법1] ";
